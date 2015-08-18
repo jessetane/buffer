@@ -692,42 +692,27 @@ function utf8Slice (buf, start, end) {
     i += bytesPerSequence
   }
 
-  return binarySlice(res, 0, res.length)
+  return decodeCodePointsArray(res)
 }
 
 function asciiSlice (buf, start, end) {
-  var ret = ''
+  var res = []
   end = Math.min(buf.length, end)
 
   for (var i = start; i < end; i++) {
-    ret += String.fromCharCode(buf[i] & 0x7F)
+    res.push(buf[i] & 0x7F)
   }
-  return ret
+  return decodeCodePointsArray(res)
 }
 
-// Based on http://stackoverflow.com/a/22747272/680742, the browser with
-// the lowest limit is Chrome, with 0x10000 args.
-var MAX_ARGUMENTS_LENGTH = 0x10000
-
 function binarySlice (buf, start, end) {
-  var len = buf.length
-  end = Math.min(len, end)
+  var res = []
+  end = Math.min(buf.length, end)
 
-  // TODO: verify, this is probably the average case
-  if (start === 0 && end === len && end <= MAX_ARGUMENTS_LENGTH) {
-    return String.fromCharCode.apply(String, buf)
+  for (var i = start; i < end; i++) {
+    res.push(buf[i])
   }
-
-  var res = ''
-
-  // Decode in chunks to avoid "call stack size exceeded".
-  for (var i = start; i < end; i += MAX_ARGUMENTS_LENGTH) {
-    var chunkEnd = Math.min(i + MAX_ARGUMENTS_LENGTH, end)
-
-    res += String.fromCharCode.apply(String, buf.slice(i, chunkEnd))
-  }
-
-  return res
+  return decodeCodePointsArray(res)
 }
 
 function hexSlice (buf, start, end) {
@@ -745,9 +730,28 @@ function hexSlice (buf, start, end) {
 
 function utf16leSlice (buf, start, end) {
   var bytes = buf.slice(start, end)
-  var res = ''
+  var res = []
   for (var i = 0; i < bytes.length; i += 2) {
-    res += String.fromCharCode(bytes[i] + bytes[i + 1] * 256)
+    res.push(bytes[i] + bytes[i + 1] * 256)
+  }
+  return decodeCodePointsArray(res)
+}
+
+// Based on http://stackoverflow.com/a/22747272/680742, the browser with
+// the lowest limit is Chrome, with 0x10000 args.
+var MAX_ARGUMENTS_LENGTH = 0x10000
+
+function decodeCodePointsArray (array) {
+  var len = array.length
+  if (len <= MAX_ARGUMENTS_LENGTH) {
+    return String.fromCharCode.apply(String, array) // avoid extra slice()
+  }
+
+  // Decode in chunks to avoid "call stack size exceeded".
+  var res = ''
+  var i = 0
+  while (i < len) {
+    res += String.fromCharCode.apply(String, array.slice(i, i += MAX_ARGUMENTS_LENGTH))
   }
   return res
 }
